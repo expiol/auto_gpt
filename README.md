@@ -46,11 +46,9 @@ cd auto-pentest
 
 ### 2. Set environment variables
 
-Create a `.env` file and configure OpenAI's API Key in it:
 
-```bash
-OPENAI_API_KEY=your_openai_api_key
-```
+Export your API key with export OPENAI_API_KEY='<your key here>',export API base with export OPENAI_BASEURL='https://api.xxxx.xxx/v1' ,if you need.
+
 
 ### 3. Run with Docker
 
