@@ -1,0 +1,12 @@
+version: '3.8'
+
+services:
+  ctf_tool_service:
+    build: .
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - OPENAI_BASEURL=${OPENAI_BASEURL:-https://api.openai.com/v1}
+    ports:
+      - "8080:8080"
+    volumes:
+      - .:/app
