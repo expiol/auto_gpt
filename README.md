@@ -59,7 +59,7 @@ You can run the project with Docker:
 ```bash
 docker-compose up
 ```
-### 3. Run with python3(recommend)
+### 4. Run with python3(recommend)
 
 You can run the project with command:
 
@@ -69,7 +69,7 @@ python3 app.py
 
 This will start the service and run it on port `8080` Run on .
 
-### 4. Run the API
+### 5. Run the API
 
 The API provides a simple endpoint to execute tasks. You can use `curl` or Postman to test:
 
