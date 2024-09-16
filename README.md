@@ -121,22 +121,3 @@ If you want to contribute code or make suggestions, please create a Pull Request
 
 This project is based on the Apache-2.0 license. Please refer to the LICENSE file for details.
 
-
-### Explanation
-
-- **Project Introduction**: A brief description of the functions and features of the project.
-
-- **Project Structure**: Lists the main files in the project and their uses.
-
-- **Quick Start**: Contains methods for cloning projects, setting environment variables, running projects, and testing.
-
-- **File Description**: A detailed description of the role of each important file in the project.
-
-- **Dependencies**: Lists the dependent libraries of the project and provides commands for how to install them.
-
-- **Usage Note**: Remind users of security issues that need to be paid attention to when using the project.
-
-- **Contributions and License**: Briefly introduce how to contribute code to the project and explain the project's license.
-
-
-```
