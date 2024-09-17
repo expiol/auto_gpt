@@ -13,3 +13,4 @@ if not GPT_API_KEY:
 
 def get_gpt_api_url(endpoint):
     return f"{GPT_API_BASEURL}/{endpoint}"
+

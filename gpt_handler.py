@@ -3,17 +3,13 @@ from config import GPT_API_KEY, get_gpt_api_url
 import logging
 from requests.exceptions import HTTPError
 from prompts import INITIALIZATION_PROMPT, COMMAND_PROMPT
-from reply_filter import extract_commands_from_response  # Import the reply filter
+from reply_filter import extract_commands_from_response
 
 def generate_commands(task_description, system_info, model_name='gpt-4'):
-    # Prepare system information summary
+    # Prepare concise system information summary
     system_info_summary = f"OS: {system_info.get('os')}\n"
     system_info_summary += f"Python Version: {system_info.get('python_version')}\n"
     system_info_summary += f"Architecture: {system_info.get('architecture')}\n"
-
-    # Limit the length to avoid exceeding token limits
-    installed_packages = '\n'.join(system_info.get('installed_packages', '').split('\n')[:50])
-    available_commands = '\n'.join(system_info.get('available_commands', '').split('\n')[:50])
 
     headers = {
         'Authorization': f'Bearer {GPT_API_KEY}',
@@ -32,8 +28,6 @@ def generate_commands(task_description, system_info, model_name='gpt-4'):
                     f"{INITIALIZATION_PROMPT}\n"
                     "Here is the system information to help you generate compatible commands:\n\n"
                     f"{system_info_summary}\n"
-                    f"Installed Packages:\n{installed_packages}\n\n"
-                    f"Available Commands:\n{available_commands}\n\n"
                     "Based on this system, generate the commands needed."
                 )
             },
@@ -60,16 +54,28 @@ def generate_commands(task_description, system_info, model_name='gpt-4'):
     response_json = response.json()
 
     commands_text = response_json['choices'][0]['message']['content']
+    logging.debug(f"GPT response: {commands_text}")
     commands = extract_commands_from_response(commands_text)
     if not commands:
         raise ValueError("No commands were extracted from GPT's response.")
     return commands
 
-def analyze_error(error_message, previous_command, model_name='gpt-4'):
+def analyze_error(error_message, previous_command, system_info, model_name='gpt-4'):
     headers = {
         'Authorization': f'Bearer {GPT_API_KEY}',
         'Content-Type': 'application/json',
     }
+
+    # Prepare concise system information summary
+    system_info_summary = f"OS: {system_info.get('os')}\n"
+    system_info_summary += f"Python Version: {system_info.get('python_version')}\n"
+    system_info_summary += f"Architecture: {system_info.get('architecture')}\n"
+
+    # Construct the message
+    user_message = (
+        f"I ran the following command and received an error:\n\nCommand: {previous_command}\nError: {error_message}\n{system_info_summary}\n"
+        "Please suggest how to fix this error by providing the exact shell commands to run, wrapped with <COMMAND> and </COMMAND> tags."
+    )
 
     data = {
         "model": model_name,
@@ -80,10 +86,7 @@ def analyze_error(error_message, previous_command, model_name='gpt-4'):
             },
             {
                 "role": "user",
-                "content": (
-                    f"I ran the following command and received an error:\n\nCommand: {previous_command}\nError: {error_message}\n\n"
-                    "Please suggest how to fix this error by providing the exact shell commands to run, wrapped with <COMMAND> and </COMMAND> tags."
-                )
+                "content": user_message
             }
         ],
         "max_tokens": 150,
@@ -105,3 +108,4 @@ def analyze_error(error_message, previous_command, model_name='gpt-4'):
 
     suggestion = response_json['choices'][0]['message']['content']
     return suggestion.strip()
+

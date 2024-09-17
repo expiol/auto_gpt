@@ -1,6 +1,7 @@
 import subprocess
 import shlex
 import re
+import logging
 
 def is_command_safe(command):
     """
@@ -20,8 +21,10 @@ def is_command_safe(command):
             return False
     return True
 
-def execute_command(command, suppress_output=False):
+def execute_command(command, suppress_output=False, timeout=60):
+    logging.debug(f"Executing command: {command}")
     if not is_command_safe(command):
+        logging.warning(f"Command is deemed unsafe and was not executed: {command}")
         return False, "Command is deemed unsafe and was not executed."
 
     try:
@@ -34,6 +37,7 @@ def execute_command(command, suppress_output=False):
                 stderr=subprocess.PIPE,
                 text=True,
                 check=True,
+                timeout=timeout
             )
             return True, result.stderr  # Return stderr in case there are important messages
         else:
@@ -42,9 +46,16 @@ def execute_command(command, suppress_output=False):
                 capture_output=True,
                 text=True,
                 check=True,
+                timeout=timeout
             )
             return True, result.stdout
+    except subprocess.TimeoutExpired:
+        logging.error(f"Command timed out after {timeout} seconds: {command}")
+        return False, f"Command timed out after {timeout} seconds."
     except subprocess.CalledProcessError as e:
+        logging.error(f"Command execution failed: {e}")
         return False, e.stderr
     except Exception as e:
+        logging.exception("An error occurred while executing the command")
         return False, str(e)
+

@@ -1,30 +1,31 @@
 import logging
-import re  # Ensure re is imported at the top
+import re
 from gpt_handler import generate_commands, analyze_error
 from command_executor import execute_command
 from system_info import collect_system_info
-from reply_filter import extract_commands_from_response  # Import the reply filter
+from reply_filter import extract_commands_from_response
+from error_handler import handle_errors
 
 class TaskManager:
     def __init__(self):
         self.commands = []
         self.current_command_index = 0
         self.task_complete = False
-        self.task_result = ""  # Output from main task commands
-        self.model_name = 'gpt-4'  # Default to gpt-4
-        self.error_handling_output = ""  # Output from error handling processes
+        self.task_result = ""
+        self.model_name = 'gpt-4'
+        logging.info("TaskManager initialized")
 
     def initialize_task(self, task_description, model_name='gpt-4'):
         try:
             self.model_name = model_name
-            # Collect system information
+            logging.info(f"Initializing task with description: {task_description} and model: {model_name}")
             system_info = collect_system_info()
-            # Generate commands with system information
+            logging.info(f"Collected system information: {system_info}")
             self.commands = generate_commands(task_description, system_info, self.model_name)
+            logging.info(f"Generated commands: {self.commands}")
             self.current_command_index = 0
             self.task_complete = False
             self.task_result = ""
-            self.error_handling_output = ""
         except Exception as e:
             logging.exception("Error in initialize_task")
             raise e
@@ -32,63 +33,119 @@ class TaskManager:
     def execute_next_command(self):
         if self.current_command_index < len(self.commands):
             command = self.commands[self.current_command_index]
-            # Check if the command is an installation command
-            if self.is_installation_command(command):
-                # Execute installation command with suppressed output
-                success, output = execute_command(command, suppress_output=True)
-                if success:
-                    logging.info(f"Installation command executed successfully: {command}")
-                else:
-                    logging.error(f"Failed to execute installation command: {command}")
-            else:
-                # Execute regular command
-                success, output = execute_command(command)
-                if success:
-                    self.task_result += output  # Only accumulate outputs from main commands
-                else:
-                    # Do not increment current_command_index so that we can retry the command after handling errors
-                    return False, output
+            logging.info(f"Executing command {self.current_command_index + 1}/{len(self.commands)}: {command}")
 
+            max_retries = 3  # Set independent max retries for each command
+            retries = 0
+
+            while retries < max_retries:
+                # Determine timeout
+                if self.is_installation_command(command):
+                    command_timeout = 300  # Set longer timeout for installation commands
+                else:
+                    command_timeout = 60  # Default timeout
+
+                success, output = execute_command(command, timeout=command_timeout)
+                if success:
+                    self.task_result += output
+                    logging.info(f"Command executed successfully: {command}")
+                    self.current_command_index += 1  # Move to next command only if successful
+                    return True, output
+                else:
+                    logging.error(f"Failed to execute command: {command}")
+                    retries += 1
+                    logging.info(f"Retrying command ({retries}/{max_retries}): {command}")
+
+                    # Attempt self-repair
+                    error_handled = self.handle_errors(output)
+                    if error_handled is True:
+                        logging.info("Error handled successfully. Retrying command.")
+                        continue  # Retry current command
+                    elif isinstance(error_handled, str):
+                        # Command modified, e.g., added sudo
+                        command = error_handled
+                        self.commands[self.current_command_index] = command
+                        logging.info(f"Modified command to resolve error: {command}")
+                        continue  # Retry with modified command
+                    else:
+                        suggestion = self.analyze_error_with_gpt(output)
+                        if suggestion:
+                            applied = self.apply_suggestion(suggestion)
+                            if applied:
+                                logging.info("Applied suggestion from GPT. Retrying command.")
+                                continue
+                            else:
+                                logging.warning("Failed to apply suggestion from GPT.")
+                        else:
+                            logging.warning("No suggestion provided by GPT.")
+                        if retries >= max_retries:
+                            logging.error("Exceeded maximum retries for command.")
+                            self.current_command_index += 1  # Skip current command, proceed to next
+                            return False, output
+
+            # If exceeded max retries, record failure and proceed to next command
+            logging.error(f"Command failed after {max_retries} retries: {command}")
             self.current_command_index += 1
-            return True, output
+            return False, output
         else:
             self.task_complete = True
+            logging.info("All commands executed, task completed")
             return True, "Task completed"
 
     def is_task_complete(self):
+        logging.info(f"Task complete status: {self.task_complete}")
         return self.task_complete
 
     def is_installation_command(self, command):
-        # Method to detect installation or update commands
         pattern = r'^\s*(sudo\s+)?(apt(-get)?|aptitude|yum|dnf|pacman|zypper|brew|pip3?)\s+(install|update|upgrade)\b'
-        return re.match(pattern, command.strip()) is not None
+        is_install = re.match(pattern, command.strip()) is not None
+        logging.info(f"Command '{command}' is installation command: {is_install}")
+        return is_install
 
     def analyze_error_with_gpt(self, error_message):
-        previous_command = self.commands[self.current_command_index]
-        suggestion = analyze_error(error_message, previous_command, self.model_name)
-        return suggestion
+        try:
+            previous_command = self.commands[self.current_command_index]
+            logging.info(f"Analyzing error with GPT for command: {previous_command}")
+            system_info = collect_system_info()
+            suggestion = analyze_error(error_message, previous_command, system_info, self.model_name)
+            logging.info(f"Error analyzed with GPT. Suggestion: {suggestion}")
+            return suggestion
+        except Exception as e:
+            logging.exception("Error in analyze_error_with_gpt")
+            return None  # Ensure returning None on exception
 
     def apply_suggestion(self, suggestion):
-        # Use the reply filter to extract commands from the suggestion
+        if not suggestion or not isinstance(suggestion, str):
+            logging.warning("No valid suggestion to apply.")
+            return False
         commands = extract_commands_from_response(suggestion)
         if not commands:
             logging.info("No commands extracted from GPT's suggestion.")
             return False
-        # Execute the commands (usually installation commands)
         for cmd in commands:
-            success, output = execute_command(cmd, suppress_output=True)  # Suppress output here
+            logging.info(f"Executing suggested command: {cmd}")
+            success, output = execute_command(cmd, suppress_output=True)
             if success:
                 logging.info(f"Suggested command executed successfully: {cmd}")
             else:
-                logging.info(f"Failed to execute suggested command: {cmd}")
+                logging.error(f"Failed to execute suggested command: {cmd}")
                 return False
         return True
 
     def get_task_result(self):
-        return self.task_result  # Only return outputs from main commands
+        logging.info(f"Task result: {self.task_result}")
+        return self.task_result
 
     def get_current_command(self):
         if self.current_command_index < len(self.commands):
-            return self.commands[self.current_command_index]
+            current_command = self.commands[self.current_command_index]
+            logging.info(f"Current command: {current_command}")
+            return current_command
         else:
+            logging.info("No current command, all commands executed")
             return None
+
+    def handle_errors(self, error_message):
+        current_command = self.get_current_command()
+        return handle_errors(error_message, current_command)
+

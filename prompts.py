@@ -15,7 +15,6 @@ When generating commands:
 Output each command on a separate line, and wrap each command with <COMMAND> and </COMMAND> tags.
 """
 
-
 COMMAND_PROMPT = """
 Generate a sequence of shell commands to perform the following subtask as part of a penetration testing process: {task_description}.
 

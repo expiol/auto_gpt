@@ -1,13 +1,20 @@
 from flask import Flask, request, jsonify
 from task_manager import TaskManager
-from error_handler import handle_errors
 import logging
+from logging_config import setup_logging
 
 app = Flask(__name__)
+setup_logging()
 task_manager = TaskManager()
 
-# Configure logging
-logging.basicConfig(level=logging.INFO)
+@app.before_request
+def log_request_info():
+    app.logger.info(f"Received {request.method} request at {request.path} with data: {request.get_json()}")
+
+@app.after_request
+def log_response_info(response):
+    app.logger.info(f"Responded with status {response.status_code} and data: {response.get_data(as_text=True)}")
+    return response
 
 @app.route('/execute-task', methods=['POST'])
 def execute_task():
@@ -22,40 +29,38 @@ def execute_task():
         # Initialize task with the selected model
         task_manager.initialize_task(task_description, model_name)
 
-        # Set a maximum number of retries to prevent infinite loops
-        max_retries = 5
-        retries = 0
-
         # Execute commands until completion
         while not task_manager.is_task_complete():
             success, output = task_manager.execute_next_command()
 
             if not success:
                 # Handle errors, including tool installation
-                error_handled = handle_errors(output)
-                if error_handled:
-                    app.logger.info("Error handled by installing missing tool.")
+                error_handled = task_manager.handle_errors(output)
+                if error_handled is True:
+                    app.logger.info("Error handled successfully. Retrying command.")
                     continue  # Retry the current command
+                elif isinstance(error_handled, str):
+                    # Command modified (e.g., added sudo)
+                    task_manager.commands[task_manager.current_command_index] = error_handled
+                    app.logger.info(f"Modified command to resolve error: {error_handled}")
+                    continue  # Retry with modified command
                 else:
                     # Use GPT to analyze the error and suggest fixes
                     suggestion = task_manager.analyze_error_with_gpt(output)
-                    # Try to apply the suggestion
-                    applied = task_manager.apply_suggestion(suggestion)
-                    retries += 1
-                    if retries >= max_retries:
-                        return jsonify({
-                            'status': 'error',
-                            'message': 'Failed to execute command after multiple retries.',
-                            'error_output': output,
-                            'suggestion': suggestion,
-                            'command': task_manager.get_current_command()
-                        }), 500
+                    if suggestion:
+                        # Try to apply the suggestion
+                        applied = task_manager.apply_suggestion(suggestion)
+                        if applied:
+                            app.logger.info("Applied suggestion from GPT. Retrying command.")
+                            continue
+                        else:
+                            app.logger.warning("Failed to apply suggestion from GPT.")
                     else:
-                        app.logger.info(f"Applied suggestion from GPT. Retrying command. Retry {retries}/{max_retries}.")
-                        continue
+                        app.logger.warning("No suggestion provided by GPT.")
+                    # Decide whether to retry or move on
+                    continue  # Skip to next command
             else:
-                # Reset retries if command succeeds
-                retries = 0
+                app.logger.info("Command executed successfully.")
 
         # Return successful result
         return jsonify({'status': 'success', 'output': task_manager.get_task_result()}), 200
@@ -66,3 +71,4 @@ def execute_task():
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=8080)
+
