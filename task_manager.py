@@ -35,21 +35,24 @@ class TaskManager:
             command = self.commands[self.current_command_index]
             logging.info(f"Executing command {self.current_command_index + 1}/{len(self.commands)}: {command}")
 
-            max_retries = 3  # Set independent max retries for each command
+            max_retries = 3  # Set a maximum number of retries for each command individually
             retries = 0
 
             while retries < max_retries:
-                # Determine timeout
+                # Determine the timeout and whether to suppress output
                 if self.is_installation_command(command):
-                    command_timeout = 300  # Set longer timeout for installation commands
+                    command_timeout = 300  # Timeout for installation commands
+                    suppress_output = True  # Suppress output for installation commands
                 else:
                     command_timeout = 60  # Default timeout
+                    suppress_output = False  # Collect output for tool commands
 
-                success, output = execute_command(command, timeout=command_timeout)
+                success, output = execute_command(command, timeout=command_timeout, suppress_output=suppress_output)
                 if success:
-                    self.task_result += output
+                    if not self.is_installation_command(command):
+                        self.task_result += output
                     logging.info(f"Command executed successfully: {command}")
-                    self.current_command_index += 1  # Move to next command only if successful
+                    self.current_command_index += 1  # Move to the next command only after successful execution
                     return True, output
                 else:
                     logging.error(f"Failed to execute command: {command}")
@@ -60,13 +63,13 @@ class TaskManager:
                     error_handled = self.handle_errors(output)
                     if error_handled is True:
                         logging.info("Error handled successfully. Retrying command.")
-                        continue  # Retry current command
+                        continue  # Retry the current command
                     elif isinstance(error_handled, str):
-                        # Command modified, e.g., added sudo
+                        # The command has been modified, for example by adding sudo
                         command = error_handled
                         self.commands[self.current_command_index] = command
                         logging.info(f"Modified command to resolve error: {command}")
-                        continue  # Retry with modified command
+                        continue  # Retry the modified command
                     else:
                         suggestion = self.analyze_error_with_gpt(output)
                         if suggestion:
@@ -80,10 +83,10 @@ class TaskManager:
                             logging.warning("No suggestion provided by GPT.")
                         if retries >= max_retries:
                             logging.error("Exceeded maximum retries for command.")
-                            self.current_command_index += 1  # Skip current command, proceed to next
+                            self.current_command_index += 1  # Skip the current command and proceed to the next one
                             return False, output
 
-            # If exceeded max retries, record failure and proceed to next command
+            # If maximum retries are exceeded, log the failure and proceed to the next command
             logging.error(f"Command failed after {max_retries} retries: {command}")
             self.current_command_index += 1
             return False, output
@@ -112,7 +115,7 @@ class TaskManager:
             return suggestion
         except Exception as e:
             logging.exception("Error in analyze_error_with_gpt")
-            return None  # Ensure returning None on exception
+            return None  # Ensure None is returned in case of an exception
 
     def apply_suggestion(self, suggestion):
         if not suggestion or not isinstance(suggestion, str):
@@ -148,4 +151,3 @@ class TaskManager:
     def handle_errors(self, error_message):
         current_command = self.get_current_command()
         return handle_errors(error_message, current_command)
-
