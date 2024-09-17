@@ -48,7 +48,10 @@ cd auto-pentest
 
 
 Export your API key with export OPENAI_API_KEY='<your key here>',export API base with export OPENAI_BASEURL='https://api.xxxx.xxx/v1' ,if you need.
-
+Or you can use this command to modify
+```bash
+nano .env
+```
 
 ### 3. Run with Docker
 
