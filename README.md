@@ -75,12 +75,7 @@ This will start the service and run it on port `8080` Run on .
 The API provides a simple endpoint to execute tasks. You can use `curl` or Postman to test:
 
 ```bash
-curl -X POST http://localhost:8080/execute-task \
--H "Content-Type: application/json" \
--d '{
-"task_description": "echo Hello, World!",
-"model_name": "gpt-4"
-}'
+curl -X POST http://localhost:8080/execute-task -H "Content-Type: application/json" -d "{\"task_description\": \"$(cat task_description.txt | sed ':a;N;$!ba;s/\n/\\n/g' | sed 's/\"/\\"/g')\", \"model_name\": \"gpt-4\"}"
 ```
 
 ## File Description
