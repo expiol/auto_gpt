@@ -1,0 +1,49 @@
+### Steps to Perform a Full Port Scan
+
+1. **Ensure You Have Permission**: Before proceeding, confirm that you have valid permission to perform the scan on the target system.
+
+2. **Install Nmap**: If Nmap is not already installed on your system, you can install it using the following commands depending on your operating system:
+   - **Linux (Debian/Ubuntu)**:
+     ```bash
+     sudo apt update
+     sudo apt install nmap
+     ```
+   - **Linux (CentOS/RHEL)**:
+     ```bash
+     sudo yum install nmap
+     ```
+   - **Windows**: Download the installer from the [Nmap Official Website](https://nmap.org/download.html) and follow the installation instructions.
+   - **macOS**: Use Homebrew to install Nmap:
+     ```bash
+     brew install nmap
+     ```
+
+3. **Identify the Target IP Address**: Make sure you know the IP address of the target system you want to scan. For example, let's assume the target IP is `192.168.1.10`.   
+
+4. **Run a Full Port Scan**: Use Nmap to perform a full port scan. The command to scan all 65535 ports is as follows:
+   ```bash
+   nmap -p- 192.168.1.10
+   ```
+   - `-p-` specifies that Nmap should scan all ports from 1 to 65535.
+
+5. **Review the Output**: Once the scan is complete, Nmap will provide a list of open ports and their associated services. Review the output for any open ports and note     
+their states.
+
+6. **Optional: Save the Output**: If you want to save the scan results for documentation or analysis, you can use the following command:
+   ```bash
+   nmap -p- 192.168.1.10 -oN full_port_scan.txt
+   ```
+   - `-oN` specifies the output format as normal text and saves it to `full_port_scan.txt`.
+
+### Example Command
+Here’s an example of how the full command might look:
+```bash
+nmap -p- 192.168.1.10
+```
+
+### Additional Considerations
+- **Verbose Mode**: If you want more detailed output, you can add the `-v` option for verbose output:
+  ```bash
+  nmap -p- -v 192.168.1.10
+  ```
+- **Scan Timing**: You can adjust the timing of the scan using the `-T` op

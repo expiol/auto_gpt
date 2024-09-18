@@ -2,6 +2,7 @@ from flask import Flask, request, jsonify
 from task_manager import TaskManager
 import logging
 from logging_config import setup_logging
+import json  # Import json to format the response
 
 app = Flask(__name__)
 setup_logging()
@@ -34,36 +35,17 @@ def execute_task():
             success, output = task_manager.execute_next_command()
 
             if not success:
-                # Handle errors, including tool installation
-                error_handled = task_manager.handle_errors(output)
-                if error_handled is True:
-                    app.logger.info("Error handled successfully. Retrying command.")
-                    continue  # Retry the current command
-                elif isinstance(error_handled, str):
-                    # Command modified (e.g., added sudo)
-                    task_manager.commands[task_manager.current_command_index] = error_handled
-                    app.logger.info(f"Modified command to resolve error: {error_handled}")
-                    continue  # Retry with modified command
-                else:
-                    # Use GPT to analyze the error and suggest fixes
-                    suggestion = task_manager.analyze_error_with_gpt(output)
-                    if suggestion:
-                        # Try to apply the suggestion
-                        applied = task_manager.apply_suggestion(suggestion)
-                        if applied:
-                            app.logger.info("Applied suggestion from GPT. Retrying command.")
-                            continue
-                        else:
-                            app.logger.warning("Failed to apply suggestion from GPT.")
-                    else:
-                        app.logger.warning("No suggestion provided by GPT.")
-                    # Decide whether to retry or move on
-                    continue  # Skip to next command
-            else:
-                app.logger.info("Command executed successfully.")
+                # Handle errors
+                continue
 
-        # Return successful result
-        return jsonify({'status': 'success', 'output': task_manager.get_task_result()}), 200
+        # Summarize task result with GPT
+        summarized_result = task_manager.summarize_task_result_with_gpt()
+
+        # Replace '\n' with actual newlines in the result for better readability
+        formatted_summary = summarized_result.replace("\\n", "\n")
+
+        # Return the formatted summary with actual newlines
+        return jsonify({'status': 'success', 'summary': formatted_summary}), 200
 
     except Exception as e:
         app.logger.exception("An error occurred in /execute-task")

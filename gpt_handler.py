@@ -109,3 +109,39 @@ def analyze_error(error_message, previous_command, system_info, model_name='gpt-
     suggestion = response_json['choices'][0]['message']['content']
     return suggestion.strip()
 
+def generate_summary_with_gpt(task_result, model_name='gpt-4'):
+    headers = {
+        'Authorization': f'Bearer {GPT_API_KEY}',
+        'Content-Type': 'application/json',
+    }
+
+    data = {
+        "model": model_name,
+        "messages": [
+            {
+                "role": "system",
+                "content": "You are an assistant that summarizes technical results into human-readable form."
+            },
+            {
+                "role": "user",
+                "content": f"Please summarize the following task result: {task_result}"
+            }
+        ],
+        "max_tokens": 200,
+        "temperature": 0.5
+    }
+
+    try:
+        response = requests.post(get_gpt_api_url('chat/completions'), headers=headers, json=data)
+        response.raise_for_status()
+    except HTTPError as http_err:
+        logging.error(f"HTTP error occurred: {http_err}")
+        raise Exception(f"HTTP error occurred: {http_err}")
+    except Exception as err:
+        logging.error(f"An error occurred: {err}")
+        raise Exception(f"An error occurred: {err}")
+
+    response_json = response.json()
+    summary = response_json['choices'][0]['message']['content']
+    return summary.strip()
+

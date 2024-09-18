@@ -1,6 +1,6 @@
 import logging
 import re
-from gpt_handler import generate_commands, analyze_error
+from gpt_handler import generate_commands, analyze_error, generate_summary_with_gpt
 from command_executor import execute_command
 from system_info import collect_system_info
 from reply_filter import extract_commands_from_response
@@ -139,6 +139,19 @@ class TaskManager:
         logging.info(f"Task result: {self.task_result}")
         return self.task_result
 
+    def summarize_task_result_with_gpt(self):
+        # Use GPT to summarize the task result
+        try:
+            logging.info("Summarizing task result using GPT")
+            system_info = collect_system_info()
+            prompt = f"Summarize the following task result:\n{self.task_result}\nSystem info: {system_info}"
+            summary = generate_summary_with_gpt(prompt, self.model_name)
+            logging.info(f"Summary generated: {summary}")
+            return summary
+        except Exception as e:
+            logging.exception("Error in summarize_task_result_with_gpt")
+            return self.task_result  # Fallback to original result if summarization fails
+
     def get_current_command(self):
         if self.current_command_index < len(self.commands):
             current_command = self.commands[self.current_command_index]
@@ -151,3 +164,4 @@ class TaskManager:
     def handle_errors(self, error_message):
         current_command = self.get_current_command()
         return handle_errors(error_message, current_command)
+
