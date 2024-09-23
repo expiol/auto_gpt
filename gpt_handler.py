@@ -145,3 +145,39 @@ def generate_summary_with_gpt(task_result, model_name='gpt-4'):
     summary = response_json['choices'][0]['message']['content']
     return summary.strip()
 
+def discuss_with_gpt(user_message, model_name='gpt-4'):
+    headers = {
+        'Authorization': f'Bearer {GPT_API_KEY}',
+        'Content-Type': 'application/json',
+    }
+
+    data = {
+        "model": model_name,
+        "messages": [
+            {
+                "role": "system",
+                "content": "You are an assistant that helps users modify command lists for task execution."
+            },
+            {
+                "role": "user",
+                "content": user_message
+            }
+        ],
+        "max_tokens": 500,
+        "temperature": 0.7
+    }
+
+    try:
+        response = requests.post(get_gpt_api_url('chat/completions'), headers=headers, json=data)
+        response.raise_for_status()
+    except HTTPError as http_err:
+        error_content = response.json()
+        logging.error(f"HTTP error occurred: {http_err} - {error_content}")
+        raise Exception(f"HTTP error occurred: {http_err} - {error_content}")
+    except Exception as err:
+        logging.error(f"An error occurred: {err}")
+        raise Exception(f"An error occurred: {err}")
+
+    response_json = response.json()
+    gpt_response = response_json['choices'][0]['message']['content']
+    return gpt_response.strip()

@@ -1,10 +1,17 @@
 import logging
 import re
-from gpt_handler import generate_commands, analyze_error, generate_summary_with_gpt
+import threading
+from gpt_handler import (
+    generate_commands,
+    analyze_error,
+    generate_summary_with_gpt,
+    discuss_with_gpt,
+)
 from command_executor import execute_command
 from system_info import collect_system_info
 from reply_filter import extract_commands_from_response
 from error_handler import handle_errors
+from socketio_instance import socketio  # Import socketio from the new module
 
 class TaskManager:
     def __init__(self):
@@ -13,6 +20,9 @@ class TaskManager:
         self.task_complete = False
         self.task_result = ""
         self.model_name = 'gpt-4'
+        self.paused = threading.Event()
+        self.paused.set()  # Initially not paused
+        self.skip_next = False
         logging.info("TaskManager initialized")
 
     def initialize_task(self, task_description, model_name='gpt-4'):
@@ -30,15 +40,47 @@ class TaskManager:
             logging.exception("Error in initialize_task")
             raise e
 
+    def get_command_list(self):
+        return self.commands
+
+    def set_command_list(self, new_commands):
+        self.commands = new_commands
+        logging.info(f"Command list updated: {self.commands}")
+
+    def pause(self):
+        self.paused.clear()
+        logging.info("Task paused")
+
+    def resume(self):
+        self.paused.set()
+        logging.info("Task resumed")
+
+    def skip(self):
+        self.skip_next = True
+        logging.info("Next command will be skipped")
+
     def execute_next_command(self):
+        self.paused.wait()  # Wait if paused
+
+        if self.skip_next:
+            logging.info(f"Skipping command {self.current_command_index + 1}/{len(self.commands)}")
+            self.skip_next = False
+            self.current_command_index += 1
+            return True, "Skipped command"
+
         if self.current_command_index < len(self.commands):
             command = self.commands[self.current_command_index]
             logging.info(f"Executing command {self.current_command_index + 1}/{len(self.commands)}: {command}")
+
+            # Emit the current command to clients
+            socketio.emit('command_output', {'command': command, 'output': f"Starting command: {command}"})
 
             max_retries = 3  # Set a maximum number of retries for each command individually
             retries = 0
 
             while retries < max_retries:
+                self.paused.wait()  # Check pause status during retries
+
                 # Determine the timeout and whether to suppress output
                 if self.is_installation_command(command):
                     command_timeout = 300  # Timeout for installation commands
@@ -48,6 +90,10 @@ class TaskManager:
                     suppress_output = False  # Collect output for tool commands
 
                 success, output = execute_command(command, timeout=command_timeout, suppress_output=suppress_output)
+
+                # Emit the output to clients
+                socketio.emit('command_output', {'command': command, 'output': output})
+
                 if success:
                     if not self.is_installation_command(command):
                         self.task_result += output
@@ -128,6 +174,9 @@ class TaskManager:
         for cmd in commands:
             logging.info(f"Executing suggested command: {cmd}")
             success, output = execute_command(cmd, suppress_output=True)
+            # Emit the output to clients
+            socketio.emit('command_output', {'command': cmd, 'output': output})
+
             if success:
                 logging.info(f"Suggested command executed successfully: {cmd}")
             else:
@@ -165,3 +214,12 @@ class TaskManager:
         current_command = self.get_current_command()
         return handle_errors(error_message, current_command)
 
+    def discuss_with_gpt(self, user_message):
+        try:
+            logging.info(f"User message for discussion: {user_message}")
+            response = discuss_with_gpt(user_message, self.model_name)
+            logging.info(f"GPT response: {response}")
+            return response
+        except Exception as e:
+            logging.exception("Error in discuss_with_gpt")
+            return "An error occurred during the discussion with GPT."

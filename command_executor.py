@@ -30,25 +30,23 @@ def execute_command(command, suppress_output=False, timeout=60):
     try:
         # Use shlex to safely split the command
         args = shlex.split(command)
-        if suppress_output:
-            result = subprocess.run(
-                args,
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.PIPE,
-                text=True,
-                check=True,
-                timeout=timeout
-            )
-            return True, result.stderr  # Return stderr in case there are important messages
+        result = subprocess.run(
+            args,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            timeout=timeout
+        )
+
+        output = result.stdout + result.stderr
+
+        if result.returncode == 0:
+            logging.debug(f"Command output: {output}")
+            return True, output
         else:
-            result = subprocess.run(
-                args,
-                capture_output=True,
-                text=True,
-                check=True,
-                timeout=timeout
-            )
-            return True, result.stdout
+            logging.error(f"Command failed with return code {result.returncode}: {output}")
+            return False, output
+
     except subprocess.TimeoutExpired:
         logging.error(f"Command timed out after {timeout} seconds: {command}")
         return False, f"Command timed out after {timeout} seconds."
@@ -58,4 +56,3 @@ def execute_command(command, suppress_output=False, timeout=60):
     except Exception as e:
         logging.exception("An error occurred while executing the command")
         return False, str(e)
-
