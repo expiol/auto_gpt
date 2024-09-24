@@ -1,6 +1,7 @@
 import logging
 import re
 import threading
+import subprocess  # 确保导入 subprocess 模块
 from gpt_handler import (
     generate_commands,
     analyze_error,
@@ -66,6 +67,11 @@ class TaskManager:
             if self.current_process and self.current_process.poll() is None:
                 logging.info("Terminating current command execution")
                 self.current_process.terminate()
+                try:
+                    self.current_process.wait(timeout=5)
+                except subprocess.TimeoutExpired:
+                    logging.info("Process did not terminate, killing it.")
+                    self.current_process.kill()
                 self.current_process = None
 
     def execute_next_command(self):
@@ -139,12 +145,30 @@ class TaskManager:
                 self.current_process = process
 
             # Read real-time output
-            for line in iter(process.stdout.readline, ''):
+            while True:
+                # Non-blocking read
+                line = process.stdout.readline()
                 if line == '' and process.poll() is not None:
                     break
-                output_lines.append(line)
-                # Emit each line to clients
-                socketio.emit('command_output', {'command': command, 'output': line})
+
+                if line:
+                    output_lines.append(line)
+                    # Emit each line to clients
+                    socketio.emit('command_output', {'command': command, 'output': line})
+
+                # Check if need to skip current command
+                if self.skip_current:
+                    logging.info(f"Skipping current command: {command}")
+                    with self.current_process_lock:
+                        process.terminate()
+                        try:
+                            process.wait(timeout=5)
+                        except subprocess.TimeoutExpired:
+                            logging.info("Process did not terminate, killing it.")
+                            process.kill()
+                        self.current_process = None
+                    self.skip_current = False
+                    return True, f"Skipped command: {command}"
 
             process.wait()
             returncode = process.returncode

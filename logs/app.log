@@ -769,3 +769,9 @@ Below this line, add a new line replacing '
 2024-09-23 23:46:07,820 - DEBUG - websocket.py - Closed WebSocket
 2024-09-23 23:46:07,820 - DEBUG - websocket.py - Failed to write closing frame -> closing socket
 2024-09-23 23:46:07,820 - DEBUG - websocket.py - Closed WebSocket
+2024-09-24 12:21:00,616 - INFO - task_manager.py - TaskManager initialized
+2024-09-24 12:21:00,638 - INFO - _internal.py - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:8080
+ * Running on http://192.168.66.51:8080
+2024-09-24 12:21:00,638 - INFO - _internal.py - [33mPress CTRL+C to quit[0m
