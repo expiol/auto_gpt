@@ -21,38 +21,23 @@ def is_command_safe(command):
             return False
     return True
 
-def execute_command(command, suppress_output=False, timeout=60):
+def execute_command_with_real_time_output(command):
     logging.debug(f"Executing command: {command}")
     if not is_command_safe(command):
         logging.warning(f"Command is deemed unsafe and was not executed: {command}")
-        return False, "Command is deemed unsafe and was not executed."
+        return None
 
     try:
-        # Use shlex to safely split the command
         args = shlex.split(command)
-        result = subprocess.run(
+        process = subprocess.Popen(
             args,
             stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
             text=True,
-            timeout=timeout
+            bufsize=1,
+            universal_newlines=True
         )
-
-        output = result.stdout + result.stderr
-
-        if result.returncode == 0:
-            logging.debug(f"Command output: {output}")
-            return True, output
-        else:
-            logging.error(f"Command failed with return code {result.returncode}: {output}")
-            return False, output
-
-    except subprocess.TimeoutExpired:
-        logging.error(f"Command timed out after {timeout} seconds: {command}")
-        return False, f"Command timed out after {timeout} seconds."
-    except subprocess.CalledProcessError as e:
-        logging.error(f"Command execution failed: {e}")
-        return False, e.stderr
+        return process
     except Exception as e:
         logging.exception("An error occurred while executing the command")
-        return False, str(e)
+        return None

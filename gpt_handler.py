@@ -57,6 +57,7 @@ def generate_commands(task_description, system_info, model_name='gpt-4'):
     logging.debug(f"GPT response: {commands_text}")
     commands = extract_commands_from_response(commands_text)
     if not commands:
+        logging.warning("No commands were extracted from GPT's response.")
         raise ValueError("No commands were extracted from GPT's response.")
     return commands
 
@@ -145,25 +146,35 @@ def generate_summary_with_gpt(task_result, model_name='gpt-4'):
     summary = response_json['choices'][0]['message']['content']
     return summary.strip()
 
-def discuss_with_gpt(user_message, model_name='gpt-4'):
+def discuss_and_generate_commands(user_message, system_info, model_name='gpt-4'):
     headers = {
         'Authorization': f'Bearer {GPT_API_KEY}',
         'Content-Type': 'application/json',
     }
+
+    system_info_summary = f"OS: {system_info.get('os')}\n"
+    system_info_summary += f"Python Version: {system_info.get('python_version')}\n"
+    system_info_summary += f"Architecture: {system_info.get('architecture')}\n"
 
     data = {
         "model": model_name,
         "messages": [
             {
                 "role": "system",
-                "content": "You are an assistant that helps users modify command lists for task execution."
+                "content": (
+                    "You are an assistant that helps generate shell commands based on user discussions."
+                )
             },
             {
                 "role": "user",
-                "content": user_message
+                "content": (
+                    f"{user_message}\n"
+                    f"Here is the system information:\n{system_info_summary}\n"
+                    "Please generate the shell commands needed to accomplish the task, and provide only the commands."
+                )
             }
         ],
-        "max_tokens": 500,
+        "max_tokens": 1000,
         "temperature": 0.7
     }
 
@@ -179,5 +190,11 @@ def discuss_with_gpt(user_message, model_name='gpt-4'):
         raise Exception(f"An error occurred: {err}")
 
     response_json = response.json()
-    gpt_response = response_json['choices'][0]['message']['content']
-    return gpt_response.strip()
+
+    commands_text = response_json['choices'][0]['message']['content']
+    logging.debug(f"GPT response: {commands_text}")
+    commands = extract_commands_from_response(commands_text)
+    if not commands:
+        logging.warning("No commands were extracted from GPT's response.")
+        return None
+    return commands

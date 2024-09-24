@@ -5,13 +5,13 @@ from gpt_handler import (
     generate_commands,
     analyze_error,
     generate_summary_with_gpt,
-    discuss_with_gpt,
+    discuss_and_generate_commands,
 )
-from command_executor import execute_command
+from command_executor import execute_command_with_real_time_output
 from system_info import collect_system_info
 from reply_filter import extract_commands_from_response
 from error_handler import handle_errors
-from socketio_instance import socketio  # Import socketio from the new module
+from socketio_instance import socketio
 
 class TaskManager:
     def __init__(self):
@@ -22,7 +22,9 @@ class TaskManager:
         self.model_name = 'gpt-4'
         self.paused = threading.Event()
         self.paused.set()  # Initially not paused
-        self.skip_next = False
+        self.skip_current = False
+        self.current_process = None
+        self.current_process_lock = threading.Lock()
         logging.info("TaskManager initialized")
 
     def initialize_task(self, task_description, model_name='gpt-4'):
@@ -56,17 +58,16 @@ class TaskManager:
         logging.info("Task resumed")
 
     def skip(self):
-        self.skip_next = True
-        logging.info("Next command will be skipped")
+        self.skip_current = True
+        logging.info("当前命令将被跳过")
+        with self.current_process_lock:
+            if self.current_process and self.current_process.poll() is None:
+                logging.info("正在终止当前命令执行")
+                self.current_process.terminate()
+                self.current_process = None
 
     def execute_next_command(self):
         self.paused.wait()  # Wait if paused
-
-        if self.skip_next:
-            logging.info(f"Skipping command {self.current_command_index + 1}/{len(self.commands)}")
-            self.skip_next = False
-            self.current_command_index += 1
-            return True, "Skipped command"
 
         if self.current_command_index < len(self.commands):
             command = self.commands[self.current_command_index]
@@ -75,64 +76,41 @@ class TaskManager:
             # Emit the current command to clients
             socketio.emit('command_output', {'command': command, 'output': f"Starting command: {command}"})
 
-            max_retries = 3  # Set a maximum number of retries for each command individually
+            max_retries = 3
             retries = 0
 
             while retries < max_retries:
-                self.paused.wait()  # Check pause status during retries
+                self.paused.wait()  # Check pause status
 
-                # Determine the timeout and whether to suppress output
-                if self.is_installation_command(command):
-                    command_timeout = 300  # Timeout for installation commands
-                    suppress_output = True  # Suppress output for installation commands
-                else:
-                    command_timeout = 60  # Default timeout
-                    suppress_output = False  # Collect output for tool commands
+                # Check if need to skip current command
+                if self.skip_current:
+                    logging.info(f"Skipping current command: {command}")
+                    self.skip_current = False
+                    self.current_command_index += 1
+                    return True, f"Skipped command: {command}"
 
-                success, output = execute_command(command, timeout=command_timeout, suppress_output=suppress_output)
-
-                # Emit the output to clients
-                socketio.emit('command_output', {'command': command, 'output': output})
+                # Execute command with real-time output
+                success, output = self.execute_command_with_real_time_output(command)
 
                 if success:
                     if not self.is_installation_command(command):
                         self.task_result += output
                     logging.info(f"Command executed successfully: {command}")
-                    self.current_command_index += 1  # Move to the next command only after successful execution
+                    self.current_command_index += 1
                     return True, output
                 else:
                     logging.error(f"Failed to execute command: {command}")
                     retries += 1
                     logging.info(f"Retrying command ({retries}/{max_retries}): {command}")
 
-                    # Attempt self-repair
+                    # Handle errors
                     error_handled = self.handle_errors(output)
-                    if error_handled is True:
-                        logging.info("Error handled successfully. Retrying command.")
-                        continue  # Retry the current command
-                    elif isinstance(error_handled, str):
-                        # The command has been modified, for example by adding sudo
-                        command = error_handled
-                        self.commands[self.current_command_index] = command
-                        logging.info(f"Modified command to resolve error: {command}")
-                        continue  # Retry the modified command
+                    if error_handled:
+                        continue
                     else:
-                        suggestion = self.analyze_error_with_gpt(output)
-                        if suggestion:
-                            applied = self.apply_suggestion(suggestion)
-                            if applied:
-                                logging.info("Applied suggestion from GPT. Retrying command.")
-                                continue
-                            else:
-                                logging.warning("Failed to apply suggestion from GPT.")
-                        else:
-                            logging.warning("No suggestion provided by GPT.")
-                        if retries >= max_retries:
-                            logging.error("Exceeded maximum retries for command.")
-                            self.current_command_index += 1  # Skip the current command and proceed to the next one
-                            return False, output
+                        break
 
-            # If maximum retries are exceeded, log the failure and proceed to the next command
+            # Exceeded max retries, skip command
             logging.error(f"Command failed after {max_retries} retries: {command}")
             self.current_command_index += 1
             return False, output
@@ -140,6 +118,40 @@ class TaskManager:
             self.task_complete = True
             logging.info("All commands executed, task completed")
             return True, "Task completed"
+
+    def execute_command_with_real_time_output(self, command):
+        try:
+            process = execute_command_with_real_time_output(command)
+
+            if process is None:
+                return False, "Failed to start the command."
+
+            output_lines = []
+            with self.current_process_lock:
+                self.current_process = process
+
+            # Read real-time output
+            for line in iter(process.stdout.readline, ''):
+                if line == '' and process.poll() is not None:
+                    break
+                output_lines.append(line)
+                # Emit each line to clients
+                socketio.emit('command_output', {'command': command, 'output': line})
+
+            process.wait()
+            returncode = process.returncode
+
+            with self.current_process_lock:
+                self.current_process = None
+
+            output = ''.join(output_lines)
+            success = returncode == 0
+
+            return success, output
+
+        except Exception as e:
+            logging.exception("Error while executing command")
+            return False, str(e)
 
     def is_task_complete(self):
         logging.info(f"Task complete status: {self.task_complete}")
@@ -161,7 +173,7 @@ class TaskManager:
             return suggestion
         except Exception as e:
             logging.exception("Error in analyze_error_with_gpt")
-            return None  # Ensure None is returned in case of an exception
+            return None
 
     def apply_suggestion(self, suggestion):
         if not suggestion or not isinstance(suggestion, str):
@@ -173,7 +185,7 @@ class TaskManager:
             return False
         for cmd in commands:
             logging.info(f"Executing suggested command: {cmd}")
-            success, output = execute_command(cmd, suppress_output=True)
+            success, output = self.execute_command_with_real_time_output(cmd)
             # Emit the output to clients
             socketio.emit('command_output', {'command': cmd, 'output': output})
 
@@ -189,7 +201,6 @@ class TaskManager:
         return self.task_result
 
     def summarize_task_result_with_gpt(self):
-        # Use GPT to summarize the task result
         try:
             logging.info("Summarizing task result using GPT")
             system_info = collect_system_info()
@@ -199,7 +210,7 @@ class TaskManager:
             return summary
         except Exception as e:
             logging.exception("Error in summarize_task_result_with_gpt")
-            return self.task_result  # Fallback to original result if summarization fails
+            return self.task_result
 
     def get_current_command(self):
         if self.current_command_index < len(self.commands):
@@ -217,9 +228,16 @@ class TaskManager:
     def discuss_with_gpt(self, user_message):
         try:
             logging.info(f"User message for discussion: {user_message}")
-            response = discuss_with_gpt(user_message, self.model_name)
-            logging.info(f"GPT response: {response}")
-            return response
+            # Use GPT to discuss and generate new commands
+            system_info = collect_system_info()
+            new_commands = discuss_and_generate_commands(user_message, system_info, self.model_name)
+            logging.info(f"New commands generated from discussion: {new_commands}")
+            if new_commands:
+                self.commands = new_commands
+                self.current_command_index = 0  # Reset command index
+                return {'commands': new_commands}
+            else:
+                return "No new commands were generated."
         except Exception as e:
             logging.exception("Error in discuss_with_gpt")
             return "An error occurred during the discussion with GPT."
