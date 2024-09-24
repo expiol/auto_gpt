@@ -13,6 +13,7 @@ from reply_filter import extract_commands_from_response
 from error_handler import handle_errors
 from socketio_instance import socketio
 
+
 class TaskManager:
     def __init__(self):
         self.commands = []
@@ -25,6 +26,7 @@ class TaskManager:
         self.skip_current = False
         self.current_process = None
         self.current_process_lock = threading.Lock()
+        self.new_commands = []  # To store commands from discussion
         logging.info("TaskManager initialized")
 
     def initialize_task(self, task_description, model_name='gpt-4'):
@@ -59,10 +61,10 @@ class TaskManager:
 
     def skip(self):
         self.skip_current = True
-        logging.info("当前命令将被跳过")
+        logging.info("Current command will be skipped")
         with self.current_process_lock:
             if self.current_process and self.current_process.poll() is None:
-                logging.info("正在终止当前命令执行")
+                logging.info("Terminating current command execution")
                 self.current_process.terminate()
                 self.current_process = None
 
@@ -108,7 +110,13 @@ class TaskManager:
                     if error_handled:
                         continue
                     else:
-                        break
+                        # Try to get suggestions from GPT
+                        suggestion = self.analyze_error_with_gpt(output)
+                        if suggestion:
+                            applied = self.apply_suggestion(suggestion)
+                            if applied:
+                                continue
+                    break
 
             # Exceeded max retries, skip command
             logging.error(f"Command failed after {max_retries} retries: {command}")
@@ -203,9 +211,7 @@ class TaskManager:
     def summarize_task_result_with_gpt(self):
         try:
             logging.info("Summarizing task result using GPT")
-            system_info = collect_system_info()
-            prompt = f"Summarize the following task result:\n{self.task_result}\nSystem info: {system_info}"
-            summary = generate_summary_with_gpt(prompt, self.model_name)
+            summary = generate_summary_with_gpt(self.task_result, self.model_name)
             logging.info(f"Summary generated: {summary}")
             return summary
         except Exception as e:
@@ -230,14 +236,25 @@ class TaskManager:
             logging.info(f"User message for discussion: {user_message}")
             # Use GPT to discuss and generate new commands
             system_info = collect_system_info()
-            new_commands = discuss_and_generate_commands(user_message, system_info, self.model_name)
+            previous_commands = '\n'.join(self.commands)
+            new_commands = discuss_and_generate_commands(user_message, previous_commands, system_info, self.model_name)
             logging.info(f"New commands generated from discussion: {new_commands}")
             if new_commands:
-                self.commands = new_commands
-                self.current_command_index = 0  # Reset command index
+                self.new_commands = new_commands  # Store temporarily
                 return {'commands': new_commands}
             else:
                 return "No new commands were generated."
         except Exception as e:
             logging.exception("Error in discuss_with_gpt")
             return "An error occurred during the discussion with GPT."
+
+    def confirm_new_commands(self):
+        if self.new_commands:
+            self.commands = self.new_commands
+            self.current_command_index = 0  # Reset command index
+            self.new_commands = []
+            logging.info("New command list confirmed and updated.")
+            return True
+        else:
+            logging.warning("No new commands to confirm.")
+            return False

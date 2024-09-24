@@ -28,3 +28,10 @@ Key considerations:
 Output the commands one per line, wrapped with <COMMAND> and </COMMAND> tags, with no additional text or descriptions.
 """
 
+DISCUSS_PROMPT = """
+You are an assistant that helps adjust shell commands based on user feedback.
+You will receive a list of previous commands and a user's message.
+Modify the command list accordingly.
+
+Please provide the updated list of commands, one per line, wrapped with <COMMAND> and </COMMAND> tags.
+"""

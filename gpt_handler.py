@@ -2,7 +2,7 @@ import requests
 from config import GPT_API_KEY, get_gpt_api_url
 import logging
 from requests.exceptions import HTTPError
-from prompts import INITIALIZATION_PROMPT, COMMAND_PROMPT
+from prompts import INITIALIZATION_PROMPT, COMMAND_PROMPT, DISCUSS_PROMPT
 from reply_filter import extract_commands_from_response
 
 def generate_commands(task_description, system_info, model_name='gpt-4'):
@@ -146,7 +146,7 @@ def generate_summary_with_gpt(task_result, model_name='gpt-4'):
     summary = response_json['choices'][0]['message']['content']
     return summary.strip()
 
-def discuss_and_generate_commands(user_message, system_info, model_name='gpt-4'):
+def discuss_and_generate_commands(user_message, previous_commands, system_info, model_name='gpt-4'):
     headers = {
         'Authorization': f'Bearer {GPT_API_KEY}',
         'Content-Type': 'application/json',
@@ -161,16 +161,13 @@ def discuss_and_generate_commands(user_message, system_info, model_name='gpt-4')
         "messages": [
             {
                 "role": "system",
-                "content": (
-                    "You are an assistant that helps generate shell commands based on user discussions."
-                )
+                "content": DISCUSS_PROMPT + f"\nSystem information:\n{system_info_summary}"
             },
             {
                 "role": "user",
                 "content": (
-                    f"{user_message}\n"
-                    f"Here is the system information:\n{system_info_summary}\n"
-                    "Please generate the shell commands needed to accomplish the task, and provide only the commands."
+                    f"Previous commands:\n{previous_commands}\n\n"
+                    f"User message:\n{user_message}"
                 )
             }
         ],
