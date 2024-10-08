@@ -3,7 +3,7 @@ import threading
 import socketio
 
 API_URL = 'http://localhost:8080'
-task_running = False  # Used to track if a task is running
+task_running = False  
 
 
 def print_menu():
@@ -118,7 +118,19 @@ def discuss_with_gpt():
                 print(f"{i}. {cmd}")
             confirm = input("是否确认新的命令列表并开始执行？(y/n): ")
             if confirm.lower() == 'y':
+                print("确认新的命令列表，开始执行任务...")
                 confirm_commands(confirmed=True, endpoint='/confirm-discuss')
+                
+                # 确认后立即开始执行任务并启动 SocketIO 监听
+                confirm_and_start_task()
+                task_running = True
+                while task_running:
+                    command = input("任务正在运行。输入 'p' 暂停并返回菜单：")
+                    if command.lower() == 'p':
+                        pause_task()
+                        task_running = False
+                    else:
+                        print("无效的输入，请输入 'p' 以暂停。")
             else:
                 print("新的命令列表未确认。")
         else:
@@ -156,7 +168,6 @@ def start_socketio_client():
 
 def main():
     global task_running
-    # 启动 SocketIO 客户端线程
     threading.Thread(target=start_socketio_client, daemon=True).start()
 
     while True:
