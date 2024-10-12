@@ -8,7 +8,7 @@ from pydantic import BaseModel, Field
 class CustomSearchInput(BaseModel):
     query: str = Field(description="要搜索的查询字符串")
 
-def run_custom_search(query: str) -> str:
+def run_google_search(query: str) -> str:
     """
     使用谷歌自定义搜索 JSON API 执行搜索，并返回结果。
     这是一个备用搜索工具，当主搜索工具不可用时使用。
@@ -57,10 +57,10 @@ def run_custom_search(query: str) -> str:
     except Exception as err:
         return f"发生未知错误: {err}"
 
-# 创建自定义搜索工具（备用工具）
-custom_search_tool = Tool.from_function(
-    func=run_custom_search,
-    name="CustomSearchBackup",
+
+google_search_tool = Tool.from_function(
+    func=run_google_search,
+    name="google_search",
     description=(
         "备用工具：用于通过谷歌自定义搜索 JSON API 执行网页搜索。"
         "输入一个搜索查询，返回相关的搜索结果。"
