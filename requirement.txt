@@ -1,0 +1,11 @@
+python-dotenv
+langchain 
+openai
+faiss-cpu
+ctparse
+py_expression_eval
+langchain_community
+langchain_openai
+google-search-results
+pydantic
+distro
