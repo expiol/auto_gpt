@@ -4,7 +4,7 @@ import os
 
 # 加载环境变量
 load_dotenv("api_keys.env", override=True)  
-
+DEFAULT_OPENAI_API_BASE = "https://api.openai.com/v1"
 from Tools.ShellTool import tools  
 from AutoAgent.AutoGPT import AutoGPT
 
@@ -16,7 +16,7 @@ from langchain_community.vectorstores import FAISS
 def main():
 
     openai_api_key = os.getenv("OPENAI_API_KEY")
-    openai_api_base = os.getenv("OPENAI_BASEURL")
+    openai_api_base = os.getenv("OPENAI_BASEURL") or DEFAULT_OPENAI_API_BASE
 
     if not openai_api_key or not openai_api_base:
         print("请在 'api_keys.env' 文件中设置 'OPENAI_API_KEY' 和 'OPENAI_BASEURL'.")
