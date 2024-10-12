@@ -18,8 +18,8 @@ def main():
     openai_api_key = os.getenv("OPENAI_API_KEY")
     openai_api_base = os.getenv("OPENAI_BASEURL") or DEFAULT_OPENAI_API_BASE
 
-    if not openai_api_key or not openai_api_base:
-        print("请在 'api_keys.env' 文件中设置 'OPENAI_API_KEY' 和 'OPENAI_BASEURL'.")
+    if not openai_api_key :
+        print("请在 'api_keys.env' 文件中设置 'OPENAI_API_KEY' ")
         return
 
     # 初始化语言模型
