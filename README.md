@@ -54,10 +54,10 @@ Before setting up the AutoGPT Cyber Security Assistant, ensure you have the foll
     
     **Note:** Ensure that the `requirements.txt` file includes all necessary packages such as `langchain`, `openai`, `serpapi`, etc.
     
-4. **Install Dependencies**
+4. **Run**
 
     ```bash
-    
+    python3 main.py
     ```
 
 ## Configuration
