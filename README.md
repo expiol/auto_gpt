@@ -29,7 +29,7 @@ Before setting up the AutoGPT Cyber Security Assistant, ensure you have the foll
 * **API Keys**:
     * **OpenAI API Key**: Required for interacting with OpenAI's GPT models.
     * **SerpAPI API Key**: Required for the `SearchTool` to perform internet searches.
-
+    * **Google API Key**: `Google_search` Alternative internet search tool(optional).
 ## Installation
 
 1. **Clone the Repository**
