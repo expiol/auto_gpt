@@ -1,5 +1,7 @@
 # AutoGPT Cyber Security Assistant
 
+**Read this in other languages: [English](README.md), [中文](README_zh.md).**
+
 **AutoGPT Cyber Security Assistant** is an intelligent agent built using LangChain and OpenAI's GPT models. It is designed to autonomously handle cybersecurity-related tasks by leveraging various tools such as Shell commands and internet search capabilities. The agent can manage tasks, utilize tools based on user instructions, and maintain both short-term and long-term memory to improve its performance over time.
 
 ## Table of Contents
