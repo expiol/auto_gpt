@@ -1,11 +1,10 @@
-# NmapTool.py
-
 import subprocess
-from langchain.tools import Tool
-from pydantic import BaseModel, Field
+from langchain.tools import StructuredTool
+from pydantic import BaseModel, Field, validator
 import threading
 import queue
 import time
+import re
 
 class NmapInput(BaseModel):
     target: str = Field(description="要扫描的目标 IP 或域名")
@@ -14,14 +13,37 @@ class NmapInput(BaseModel):
         default="1-65535"
     )
 
+    @validator('target')
+    def validate_target(cls, v):
+        ip_pattern = re.compile(
+            r"^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$"
+        )
+        domain_pattern = re.compile(
+            r"^(?=.{1,253}$)(?!-)([A-Za-z0-9-]{1,63}\.)+[A-Za-z]{2,6}$"
+        )
+        if not ip_pattern.match(v) and not domain_pattern.match(v):
+            raise ValueError("目标必须是有效的 IP 地址或域名")
+        return v
+
+    @validator('ports')
+    def validate_ports(cls, v):
+        if v != "1-65535":
+            port_range_pattern = re.compile(r"^\d{1,5}-\d{1,5}$")
+            if not port_range_pattern.match(v):
+                raise ValueError("端口范围必须符合 '起始端口-结束端口' 格式，例如 '80-443'")
+            start, end = map(int, v.split('-'))
+            if not (1 <= start <= 65535 and 1 <= end <= 65535 and start <= end):
+                raise ValueError("端口范围必须在 1 到 65535 之间，并且起始端口小于或等于结束端口")
+        return v
+
 def run_nmap_scan(target: str, ports: str = "1-65535") -> str:
     """执行 nmap 扫描，实时返回开放的端口和运行的服务"""
     try:
-        # 构建 nmap 命令，使用 -T4 提高扫描速度，-p 指定端口范围，-sV 探测服务版本
-        command = f"nmap -T4 -p {ports} -sV {target}"
+        # 使用列表形式构建命令，避免命令注入
+        command = ["nmap", "-T4", "-p", ports, "-sV", target]
         process = subprocess.Popen(
             command,
-            shell=True,
+            shell=False,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True
@@ -102,9 +124,10 @@ def run_nmap_scan(target: str, ports: str = "1-65535") -> str:
     except Exception as e:
         return f"执行过程中发生错误：{str(e)}"
 
-nmap_tool = Tool.from_function(
-    func=run_nmap_scan,
+# 创建结构化工具
+nmap_tool = StructuredTool(
     name="NmapScan",
-    description="用于扫描目标的开放端口和运行的服务。输入目标 IP 或域名，可选的端口范围。",
+    description="用于扫描目标的开放端口和运行的服务。输入目标 IP 或域名，以及可选的端口范围。例如，端口范围默认为 '1-65535'，也可以指定其他范围如 '80-443'。",
+    func=run_nmap_scan,
     args_schema=NmapInput
 )
