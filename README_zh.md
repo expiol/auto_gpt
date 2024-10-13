@@ -51,7 +51,7 @@ source venv/bin/activate # 在 Windows 上：venv\Scripts\activate
 pip3 install -r requirements.txt
 ```
 
-**注意：**确保 `requirements.txt` 文件包含所有必需的软件包，例如 `langchain`、`openai`、`serpapi` 等。
+**注意**：确保 `requirements.txt` 文件包含所有必需的软件包，例如 `langchain`、`openai`、`serpapi` 等。
 
 4. **运行**
 
