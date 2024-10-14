@@ -145,7 +145,7 @@ class AutoGPT:
                         user_choice = self._prompt_user_choice()
                         if user_choice == '1':
                             # 选项1：总结并退出
-                            reply = self._final_step(short_term_memory, initial_task_description)
+                            reply = self._final_step(summary_memory, initial_task_description)
                             print(reply)
                             finish_all_tasks = True
                             break
@@ -340,7 +340,7 @@ class AutoGPT:
                 return tool
         return None
 
-    def _final_step(self, short_term_memory, task_description):
+    def _final_step(self, summary_memory, task_description):
         finish_prompt = (
             PromptTemplateBuilder(self.prompts_path, "finish_instruction.templ")
             .build()
@@ -348,7 +348,7 @@ class AutoGPT:
                 ai_name=self.agent_name,
                 ai_role=self.agent_role,
                 task_description=task_description,
-                short_term_memory=short_term_memory.load_memory_variables({}).get("history", ""),
+                short_term_memory=summary_memory.load_memory_variables({}).get("history", ""),
             )
         )
 
