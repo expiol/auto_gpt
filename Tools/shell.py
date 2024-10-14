@@ -13,15 +13,18 @@ class ShellInput(BaseModel):
 def run_shell_command(command: str) -> str:
     """执行一般的 Shell 命令，实时返回输出"""
     try:
-        process = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        process = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, bufsize=1)
 
         output_queue = queue.Queue()
         error_queue = queue.Queue()
 
         # 定义线程函数来读取输出
         def read_output(pipe, queue):
-            for line in iter(pipe.readline, ''):
-                queue.put(line)
+            while True:
+                chunk = pipe.read(1024)
+                if not chunk:
+                    break
+                queue.put(chunk)
             pipe.close()
 
         # 创建线程读取 stdout 和 stderr
@@ -32,20 +35,20 @@ def run_shell_command(command: str) -> str:
         stderr_thread.start()
 
         # 实时收集输出
-        output = ''
-        error = ''
+        output = b''
+        error = b''
         while True:
             try:
-                line = output_queue.get_nowait()
-                output += line
-                print(line, end='')  # 实时打印输出
+                chunk = output_queue.get_nowait()
+                output += chunk
+                print(chunk.decode(errors='ignore'), end='')  # 实时打印输出
             except queue.Empty:
                 pass
 
             try:
-                line = error_queue.get_nowait()
-                error += line
-                print(line, end='')  # 实时打印错误
+                chunk = error_queue.get_nowait()
+                error += chunk
+                print(chunk.decode(errors='ignore'), end='')  # 实时打印错误
             except queue.Empty:
                 pass
 
@@ -59,9 +62,9 @@ def run_shell_command(command: str) -> str:
         stderr_thread.join()
 
         if output.strip():
-            return output.strip()
+            return output.decode(errors='ignore').strip()
         elif error.strip():
-            return f"命令执行错误：{error.strip()}"
+            return f"命令执行错误：{error.decode(errors='ignore').strip()}"
         else:
             return "命令执行完成，但没有输出。"
 
@@ -70,9 +73,10 @@ def run_shell_command(command: str) -> str:
     except Exception as e:
         return f"命令执行过程中发生异常：{str(e)}"
 
+
 shell_tool = Tool.from_function(
     func=run_shell_command,
     name="Shell",
-    description="用于执行一般的 Shell 命令。请谨慎使用，确保命令的安全性。",
+    description="用于执行Shell 命令",
     args_schema=ShellInput
 )
