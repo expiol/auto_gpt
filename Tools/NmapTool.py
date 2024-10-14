@@ -1,9 +1,9 @@
 import subprocess
-from langchain.tools import Tool
-from pydantic import BaseModel, Field
+from pydantic.v1 import BaseModel, Field
 import threading
 import queue
 import time
+from langchain.tools import StructuredTool
 
 class NmapInput(BaseModel):
     target: str = Field(description="要扫描的目标 IP 或域名")
@@ -121,7 +121,7 @@ def run_nmap_scan(target: str, ports: str = "1-65535") -> str:
     except Exception as e:
         return f"执行过程中发生错误：{str(e)}"
 
-nmap_tool = Tool.from_function(
+nmap_tool = StructuredTool.from_function(
     func=run_nmap_scan,
     name="NmapScan",
     description="用于扫描目标的开放端口和运行的服务。输入目标 IP 或域名，可选的端口范围。",

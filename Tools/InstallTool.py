@@ -1,6 +1,6 @@
 import subprocess
-from langchain.tools import Tool
-from pydantic import BaseModel, Field
+from langchain.tools import StructuredTool
+from pydantic.v1 import BaseModel, Field
 import platform
 
 # 扩展后的允许安装的工具列表（用于网络安全和系统管理）
@@ -98,7 +98,7 @@ def check_and_install_tool(tool_name: str) -> str:
     except Exception as e:
         return f"发生未知错误：{str(e)}"
 
-install_tool = Tool.from_function(
+install_tool = StructuredTool.from_function(
     func=check_and_install_tool,
     name="InstallTool",
     description="用于检查并安装所需的工具（仅限允许的工具）。请确保遵守所有适用的法律和法规，合法、道德地使用这些工具。",

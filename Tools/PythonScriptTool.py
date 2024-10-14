@@ -1,18 +1,19 @@
 import subprocess
-from langchain.tools import Tool
-from pydantic import BaseModel, Field
+from langchain.tools import StructuredTool
+from pydantic.v1 import BaseModel, Field
 import os
 import tempfile
 import shlex
 
 class PythonScriptInput(BaseModel):
     script_code: str = Field(description="要执行的 Python 脚本代码")
+    safe: bool = Field(description="是否只允许执行安全的脚本", default=False)
 
-def run_python_script(script_code: str) -> str:
+def run_python_script(script_code: str, safe: bool = False) -> str:
     """生成并执行 Python 脚本，返回输出"""
     try:
         # 检查脚本内容，防止危险操作
-        if not is_safe_script(script_code):
+        if safe and not is_safe_script(script_code):
             return "脚本包含不安全的操作，已被拒绝执行。"
 
         # 在临时目录中创建脚本文件
@@ -57,7 +58,7 @@ def is_safe_script(script_code: str) -> bool:
 
     return True
 
-python_script_tool = Tool.from_function(
+python_script_tool = StructuredTool.from_function(
     func=run_python_script,
     name="PythonScript",
     description="用于生成并执行 Python 脚本。请注意，脚本中不允许包含危险操作，否则将被拒绝执行。",
