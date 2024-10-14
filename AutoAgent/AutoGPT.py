@@ -148,7 +148,7 @@ class AutoGPT:
                             reply = self._final_step(summary_memory, initial_task_description)
                             print(reply)
                             finish_all_tasks = True
-                            break
+                            return reply
                         elif user_choice == '2':
                             # 选项2：添加讨论并修改操作
                             additional_discussion = self._get_user_input("请输入额外的讨论内容，以修改操作：")
@@ -238,7 +238,7 @@ class AutoGPT:
                 )
 
             if finish_turn:  # 如果满足结束条件，则进行后续处理
-                reply = self._final_step(short_term_memory, initial_task_description)
+                reply = self._final_step(summary_memory, initial_task_description)
                 print(reply)  # Optionally print the final reply
 
                 # Prompt the user to decide whether to continue or exit
