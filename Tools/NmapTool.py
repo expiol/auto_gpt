@@ -1,10 +1,9 @@
 import subprocess
-from langchain.tools import StructuredTool
-from pydantic import BaseModel, Field, validator
+from langchain.tools import Tool
+from pydantic import BaseModel, Field
 import threading
 import queue
 import time
-import re
 
 class NmapInput(BaseModel):
     target: str = Field(description="要扫描的目标 IP 或域名")
@@ -13,37 +12,14 @@ class NmapInput(BaseModel):
         default="1-65535"
     )
 
-    @validator('target')
-    def validate_target(cls, v):
-        ip_pattern = re.compile(
-            r"^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$"
-        )
-        domain_pattern = re.compile(
-            r"^(?=.{1,253}$)(?!-)([A-Za-z0-9-]{1,63}\.)+[A-Za-z]{2,6}$"
-        )
-        if not ip_pattern.match(v) and not domain_pattern.match(v):
-            raise ValueError("目标必须是有效的 IP 地址或域名")
-        return v
-
-    @validator('ports')
-    def validate_ports(cls, v):
-        if v != "1-65535":
-            port_range_pattern = re.compile(r"^\d{1,5}-\d{1,5}$")
-            if not port_range_pattern.match(v):
-                raise ValueError("端口范围必须符合 '起始端口-结束端口' 格式，例如 '80-443'")
-            start, end = map(int, v.split('-'))
-            if not (1 <= start <= 65535 and 1 <= end <= 65535 and start <= end):
-                raise ValueError("端口范围必须在 1 到 65535 之间，并且起始端口小于或等于结束端口")
-        return v
-
 def run_nmap_scan(target: str, ports: str = "1-65535") -> str:
     """执行 nmap 扫描，实时返回开放的端口和运行的服务"""
     try:
-        # 使用列表形式构建命令，避免命令注入
-        command = ["nmap", "-T4", "-p", ports, "-sV", target]
+        # 构建 nmap 命令，使用 -T4 提高扫描速度，-p 指定端口范围，-sV 探测服务版本
+        command = f"nmap -T4 -p {ports} -sV {target}"
         process = subprocess.Popen(
             command,
-            shell=False,
+            shell=True,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True
@@ -94,6 +70,7 @@ def run_nmap_scan(target: str, ports: str = "1-65535") -> str:
         # 处理输出，只提取开放的端口和服务信息
         output = ''.join(output_lines)
         open_ports = []
+        fingerprints = []
         capture = False
         for line in output.split('\n'):
             if line.startswith("PORT"):
@@ -101,21 +78,41 @@ def run_nmap_scan(target: str, ports: str = "1-65535") -> str:
                 continue
             if capture:
                 if line.strip() == "" or line.startswith("Nmap done"):
-                    break
+                    capture = False
+                    continue
                 # 分析每一行，确保端口是开放的
                 parts = line.split()
                 if len(parts) >= 3 and parts[1].lower() == "open":
                     open_ports.append(line.strip())
+                # 检查是否有指纹信息
+                if ":SF:" in line:
+                    fingerprints.append(line.strip())
+
+        result_sections = []
 
         if open_ports:
-            result_text = f"目标 {target} 的开放端口和服务信息：\n" + "\n".join(open_ports)
+            ports_info = f"目标 {target} 的开放端口和服务信息：\n" + "\n".join(open_ports)
+            result_sections.append(ports_info)
         else:
-            result_text = f"未发现目标 {target} 的开放端口。"
+            result_sections.append(f"未发现目标 {target} 的开放端口。")
 
-        # 限制输出长度
-        MAX_OUTPUT_LENGTH = 2000
+        if fingerprints:
+            fingerprints_info = "发现的服务指纹信息（可能未被识别）：\n" + "\n".join(fingerprints)
+            result_sections.append(fingerprints_info)
+
+        result_text = "\n\n".join(result_sections)
+
+        MAX_OUTPUT_LENGTH = 8000
         if len(result_text) > MAX_OUTPUT_LENGTH:
-            result_text = result_text[:MAX_OUTPUT_LENGTH] + "\n...结果过长，已截断。"
+            # 尝试保留指纹信息
+            if fingerprints:
+                fingerprints_text = "\n\n".join([section for section in result_sections if "指纹信息" in section])
+                if len(fingerprints_text) <= MAX_OUTPUT_LENGTH:
+                    result_text = fingerprints_text + "\n...部分结果已截断。"
+                else:
+                    result_text = fingerprints_text[:MAX_OUTPUT_LENGTH] + "\n...结果过长，已截断。"
+            else:
+                result_text = result_text[:MAX_OUTPUT_LENGTH] + "\n...结果过长，已截断。"
 
         return result_text
 
@@ -124,10 +121,9 @@ def run_nmap_scan(target: str, ports: str = "1-65535") -> str:
     except Exception as e:
         return f"执行过程中发生错误：{str(e)}"
 
-# 创建结构化工具
-nmap_tool = StructuredTool(
-    name="NmapScan",
-    description="用于扫描目标的开放端口和运行的服务。输入目标 IP 或域名，以及可选的端口范围。例如，端口范围默认为 '1-65535'，也可以指定其他范围如 '80-443'。",
+nmap_tool = Tool.from_function(
     func=run_nmap_scan,
+    name="NmapScan",
+    description="用于扫描目标的开放端口和运行的服务。输入目标 IP 或域名，可选的端口范围。",
     args_schema=NmapInput
 )
