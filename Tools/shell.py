@@ -1,5 +1,3 @@
-# ShellTool.py
-
 import subprocess
 from langchain.tools import Tool
 from pydantic import BaseModel, Field
