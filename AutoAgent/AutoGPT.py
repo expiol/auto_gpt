@@ -249,40 +249,22 @@ class AutoGPT:
 
             if finish_turn:  # 如果满足结束条件，则进行后续处理
                 reply = self._final_step(summary_memory, initial_task_description)
-                print(reply)  # Optionally print the final reply
-
-                # Prompt the user to decide whether to continue or exit
-                user_decision = self._prompt_user_to_continue()
-                if user_decision.lower() in ['yes', 'y', '是', 'y是', '是的']:
-                    # Prompt the user for the next task description
-                    task_description = self._get_user_input("请输入下一个任务描述：")
-                    initial_task_description = task_description  # Update for next iteration
-                    # Continue the loop with the new task_description
-                    continue
-                else:
-                    # User chose to exit, clear memories
-                    finish_all_tasks = True
-                    short_term_memory.clear()
-                    if long_term_memory is not None:
-                        self._clear_long_term_memory(long_term_memory)
-                    print("记忆已清除，任务已结束。")
-                    break
             else:  # 没有结果，返回最后一次思考的结果
                 reply = thought_and_action.thought.speak
-                print(reply)
-                # Decide whether to continue based on the context
-                user_decision = self._prompt_user_to_continue()
-                if user_decision.lower() in ['yes', 'y', '是', 'y是', '是的']:
-                    task_description = self._get_user_input("请输入下一个任务描述：")
-                    initial_task_description = task_description  # Update for next iteration
-                    continue
-                else:
-                    finish_all_tasks = True
-                    short_term_memory.clear()
-                    if long_term_memory is not None:
-                        self._clear_long_term_memory(long_term_memory)
-                    print("记忆已清除，任务已结束。")
-                    break
+            print(reply)
+            # Decide whether to continue based on the context
+            user_decision = self._prompt_user_to_continue()
+            if user_decision.lower() in ['yes', 'y', '是', 'y是', '是的']:
+                task_description = self._get_user_input("请输入下一个任务描述：")
+                initial_task_description = task_description  # Update for next iteration
+                continue
+            else:
+                finish_all_tasks = True
+                # short_term_memory.clear()
+                # if long_term_memory is not None:
+                #     self._clear_long_term_memory(long_term_memory)
+                # print("记忆已清除，任务已结束。")
+                break
 
         return reply
 
