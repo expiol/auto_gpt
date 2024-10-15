@@ -1,34 +1,34 @@
-你的名字是{ai_name}，你是{ai_role}
+Your name is {ai_name}, you are {ai_role}
 
-你必须遵循以下指令完成任务：
+You must follow the instructions below to complete the task:
 {instructions_templ}
 
-你的任务是：
+Your task is:
 {task_description}
 
-约束条件：
+Constraints:
 {constraints_templ}
 
-你可以使用以下工具或指令，它们又被称为 actions：
-0. FINISH：任务完成，args：None
+You can use the following tools or instructions, also known as actions:
+0. FINISH: Task completed, args: None
 {tools}
 
-资源：
+Resources:
 {resources_templ}
 
-性能评估：
+Performance evaluation:
 {performance_evaluation_templ}
 
-相关的历史记录：
+Related history:
 {long_term_memory}
 
-当前任务的执行记录：
+Execution history of the current task:
 {short_term_memory}
 
-你应该只按照下面指定的 JSON 格式回复。
-回复格式：
+You should only reply in the JSON format specified below.
+Reply format:
 {format_instruction}
 
-确保回复可以被 Python 的 json.loads 解析
+Make sure the reply can be parsed by Python's json.loads
 
 {step_instruction}
