@@ -1,6 +1,6 @@
 import subprocess
-from langchain.tools import Tool
-from pydantic import BaseModel, Field
+from langchain.tools import StructuredTool
+from pydantic.v1 import BaseModel, Field
 import threading
 import queue
 import time
@@ -72,7 +72,7 @@ def run_shell_command(command: str) -> str:
         return f"命令执行过程中发生异常：{str(e)}"
 
 
-shell_tool = Tool.from_function(
+shell_tool = StructuredTool.from_function(
     func=run_shell_command,
     name="Shell",
     description="用于执行Shell 命令",

@@ -1,5 +1,9 @@
 import requests
-from langchain.tools import Tool
+from langchain.tools import StructuredTool
+from pydantic.v1 import BaseModel, Field
+
+class CVEQuery(BaseModel):
+    query: str = Field(description="要搜索的 CVE 编号")
 
 def cve_search(query: str) -> str:
     """根据查询搜索 CVE 信息"""
@@ -23,8 +27,9 @@ def cve_search(query: str) -> str:
         return f"检索 CVE 信息时出错。状态码: {response.status_code}"
 
 # 使用 langchain 的工具
-cve_search_tool = Tool.from_function(
+cve_search_tool = StructuredTool.from_function(
     func=cve_search,
     name="CVE Search",
-    description="根据查询搜索 CVE（公共漏洞和暴露）信息"
+    description="根据查询搜索 CVE（公共漏洞和暴露）信息",
+    args_schema=CVEQuery
 )

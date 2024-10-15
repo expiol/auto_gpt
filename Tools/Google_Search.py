@@ -2,8 +2,8 @@
 
 import os
 import requests
-from langchain.tools import Tool
-from pydantic import BaseModel, Field
+from langchain.tools import StructuredTool
+from pydantic.v1 import BaseModel, Field
 
 class CustomSearchInput(BaseModel):
     query: str = Field(description="要搜索的查询字符串")
@@ -58,7 +58,7 @@ def run_google_search(query: str) -> str:
         return f"发生未知错误: {err}"
 
 
-google_search_tool = Tool.from_function(
+google_search_tool = StructuredTool.from_function(
     func=run_google_search,
     name="google_search",
     description=(

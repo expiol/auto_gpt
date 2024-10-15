@@ -2,8 +2,8 @@ from typing import List, Optional
 from langchain.prompts import PromptTemplate
 from langchain_core.output_parsers.base import BaseOutputParser
 from langchain_core.tools import BaseTool
-from Utils.FileUtils import load_file
-from Utils.CommonUtils import *
+from .FileUtils import load_file
+from .CommonUtils import *
 import json
 
 class PromptTemplateBuilder:

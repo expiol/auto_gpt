@@ -4,9 +4,9 @@ from langchain.tools import BaseTool
 from langchain.vectorstores.base import VectorStoreRetriever
 from langchain.output_parsers import PydanticOutputParser
 from typing import List, Optional
-from Utils.ThoughtAndAction import ThoughtAndAction
-from Utils.CommonUtils import Friendly  
-from Utils.PromptTemplateBuilder import PromptTemplateBuilder
+from ..Utils.ThoughtAndAction import ThoughtAndAction
+from ..Utils.CommonUtils import Friendly  
+from ..Utils.PromptTemplateBuilder import PromptTemplateBuilder
 from langchain.memory import (
     ConversationBufferWindowMemory,
     ConversationSummaryMemory,
@@ -153,19 +153,29 @@ class AutoGPT:
                             # 选项2：添加讨论并修改操作
                             additional_discussion = self._get_user_input("请输入额外的讨论内容，以修改操作：")
                             
-                            # 将讨论内容添加到长时记忆中，以便 GPT 进行调整
-                            summary_memory.save_context(
-                                {"input": "用户添加的讨论内容"},
-                                {"output": additional_discussion},
+                            # 短期记忆
+                            short_term_memory.save_context(
+                                {"input": "用户补充：" + additional_discussion},
+                                {"output": "已记录用户的补充内容，并将在下一步操作中考虑这些信息。"},
                             )
                             
+                            # 摘要记忆
+                            summary_memory.save_context(
+                                {"input": "用户补充：" + additional_discussion},
+                                {"output": "系统已记录用户的补充内容，并将在下一步操作中考虑这些信息。"},
+                            )
+                            
+                            # 长期记忆
                             if long_term_memory is not None:
                                 long_term_memory.save_context(
-                                    {"input": "用户添加的讨论内容"},
-                                    {"output": additional_discussion},
+                                    {"input": "用户补充：" + additional_discussion},
+                                    {"output": "记录用户补充内容以供后续参考。"},
                                 )
                             
                             print("已添加额外的讨论内容，系统将重新评估操作。")
+                            
+                            # 更新任务描述，包含新的讨论内容
+                            initial_task_description += f"\n用户补充：{additional_discussion}"
                             
                             # 重新构建链以包含更新后的长时记忆
                             prompt_template = (

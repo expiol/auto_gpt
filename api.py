@@ -1,10 +1,3 @@
-
-from dotenv import load_dotenv
-import os
-
-# 加载环境变量
-load_dotenv("api_keys.env", override=True)  
-DEFAULT_OPENAI_API_BASE = "https://api.openai.com/v1"
 from .Tools.ShellTool import tools  
 from .AutoAgent.AutoGPT import AutoGPT
 
@@ -13,8 +6,11 @@ from langchain_openai import OpenAIEmbeddings
 from langchain.schema import Document
 from langchain_community.vectorstores import FAISS
 
-def main():
+import os
 
+DEFAULT_OPENAI_API_BASE = "https://api.openai.com/v1"
+
+def get_AutoGPT():
     openai_api_key = os.getenv("OPENAI_API_KEY")
     openai_api_base = os.getenv("OPENAI_BASEURL") or DEFAULT_OPENAI_API_BASE
 
@@ -28,7 +24,7 @@ def main():
         openai_api_key=openai_api_key,
         openai_api_base=openai_api_base
     )
-    prompts_path = "./Prompts"
+    prompts_path = "./action/Prompts"
 
     # 初始化嵌入模型
     embeddings = OpenAIEmbeddings(
@@ -44,34 +40,12 @@ def main():
     ) 
     retriever = db.as_retriever()
 
-    # 选择模式
-    while True:
-        mode = input("请选择模式：1. 全自动 2. 人工检查 (输入 '1' 或 '2'):\n>>> ").strip()
-        if mode == '1':
-            manual = False
-            break
-        elif mode == '2':
-            manual = True
-            break
-        else:
-            print("无效输入，请输入 '1' 或 '2'。")
-
-    # 初始化智能代理
     agent = AutoGPT(
         llm=llm,
         prompts_path=prompts_path,
         tools=tools,
         memory_retriever=retriever,
-        manual=manual
+        manual=True
     )
+    return agent
 
-    while True:
-        task = input("请输入您的网络安全问题（输入 'quit' 退出）：\n>>> ")
-        if task.strip().lower() == "quit":
-            print("程序已退出。")
-            break
-        reply = agent.run(task_description=task, verbose=True)
-        print(f"\n回复：\n{reply}\n")
-
-if __name__ == '__main__':
-    main()
