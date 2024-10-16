@@ -85,7 +85,7 @@ def run_nmap_scan(target: str, ports: str = "1-65535") -> str:
                 if len(parts) >= 3 and parts[1].lower() == "open":
                     open_ports.append(line.strip())
                 # 检查是否有指纹信息
-                if ":SF:" in line:
+                if "SF:" in line:
                     fingerprints.append(line.strip())
 
         result_sections = []

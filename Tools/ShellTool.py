@@ -11,16 +11,19 @@ from .NmapTool import nmap_tool  # 导入 Nmap 工具
 from .search_tool import search_tool
 from .Google_Search import google_search_tool
 from .HTTPRequestTool import http_request_tool  # 导入新的 HTTP 请求工具
-
+from .Builde_Server import build_server_tool
+from .Creat_File import create_file_tool
 # 定义可用的工具列表
 tools = [
-    search_tool,
-    cve_search_tool,
+    #search_tool,
+    #cve_search_tool,
     shell_tool,  
     install_tool,
-    python_script_tool,
+    #python_script_tool,
     nmap_tool,
     google_search_tool,
-    http_request_tool,  # 添加新的 HTTP 请求工具
+    http_request_tool,
+    build_server_tool,
+    create_file_tool,
     # 可以在此添加更多工具
 ]

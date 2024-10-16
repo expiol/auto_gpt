@@ -1,4 +1,5 @@
 import subprocess
+import sys
 from langchain.tools import StructuredTool
 from pydantic.v1 import BaseModel, Field
 import os
@@ -20,9 +21,11 @@ def run_python_script(script_code: str, safe: bool = False) -> str:
         with tempfile.NamedTemporaryFile('w', suffix='.py', delete=False) as temp_script:
             temp_script.write(script_code)
             temp_script_path = temp_script.name
-
+            
+        temp_script_path = os.path.abspath(temp_script_path)
         # 定义命令，在受限环境中执行脚本（例如，使用虚拟环境或沙箱）
-        command = f"python3 {shlex.quote(temp_script_path)}"
+        python_executable = sys.executable
+        command = f'"{python_executable}" "{temp_script_path}"'
 
         # 执行命令，捕获输出和错误
         result = subprocess.run(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)

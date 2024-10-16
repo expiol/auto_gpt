@@ -13,7 +13,7 @@ def send_http_request(url: str, method: str, headers: Optional[dict] = None, dat
     """发送 HTTP 请求并获取响应"""
     try:
         response = requests.request(method, url, headers=headers, data=data, timeout=10)
-        return f"HTTP 状态码: {response.status_code}\n响应头: {dict(response.headers)}\n响应体: {response.text[:500]}..."
+        return f"HTTP 状态码: {response.status_code}\n响应头: {dict(response.headers)}\n响应体: {response.text}..."
     except Exception as e:
         return f"发送 HTTP 请求时出错：{str(e)}"
 
