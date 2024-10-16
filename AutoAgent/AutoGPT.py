@@ -55,6 +55,20 @@ class AutoGPT:
             .build()
             .format()
         )
+        # Initialize memories
+        self.short_term_memory = ConversationBufferWindowMemory(
+            ai_prefix="Reason",  # 默认格式是：human 和 AI，AutoGpt 不存在 human，所以改成和我们情况符合的思考和行动
+            human_prefix="Act",
+            k=self.max_thought_steps,  # 短时记忆存储的窗口大小，设置为思考步数，表示全部存储
+        )
+
+
+        if self.memory_retriever is not None:
+            self.long_term_memory = VectorStoreRetrieverMemory(
+                retriever=self.memory_retriever,
+            )
+        else:
+            self.long_term_memory = None
 
     def run(self, task_description: str, verbose=False) -> str:
         """
@@ -64,13 +78,6 @@ class AutoGPT:
         finish_all_tasks = False
         reply = ""
 
-        # Initialize memories
-        short_term_memory = ConversationBufferWindowMemory(
-            ai_prefix="Reason",  # 默认格式是：human 和 AI，AutoGpt 不存在 human，所以改成和我们情况符合的思考和行动
-            human_prefix="Act",
-            k=self.max_thought_steps,  # 短时记忆存储的窗口大小，设置为思考步数，表示全部存储
-        )
-
         # 长时记忆通过 summary 来总结，使用统一的 self.llm
         summary_memory = ConversationSummaryMemory(
             llm=self.llm,  
@@ -78,13 +85,6 @@ class AutoGPT:
             ai_prefix="Reason",
             human_prefix="Act",
         )
-
-        if self.memory_retriever is not None:
-            long_term_memory = VectorStoreRetrieverMemory(
-                retriever=self.memory_retriever,
-            )
-        else:
-            long_term_memory = None
 
         while not finish_all_tasks:
             thought_step_count = 0  # 当前思考轮数
@@ -110,8 +110,8 @@ class AutoGPT:
                 thought_and_action = self._step(
                     chain=chain,
                     task_description=initial_task_description,
-                    short_term_memory=short_term_memory,
-                    long_term_memory=long_term_memory,
+                    short_term_memory=self.short_term_memory,
+                    long_term_memory=self.long_term_memory,
                 )
                 # 判断是否重复，如果重复，则需要重新思考
                 action = thought_and_action.action
@@ -119,8 +119,8 @@ class AutoGPT:
                     thought_and_action = self._step(
                         chain=chain,
                         task_description=initial_task_description,
-                        short_term_memory=short_term_memory,
-                        long_term_memory=long_term_memory,
+                        short_term_memory=self.short_term_memory,
+                        long_term_memory=self.long_term_memory,
                         force_rethink=True,
                     )
                     action = thought_and_action.action
@@ -154,7 +154,7 @@ class AutoGPT:
                             additional_discussion = self._get_user_input("请输入额外的讨论内容，以修改操作：")
                             
                             # 短期记忆
-                            short_term_memory.save_context(
+                            self.short_term_memory.save_context(
                                 {"input": "用户补充：" + additional_discussion},
                                 {"output": "已记录用户的补充内容，并将在下一步操作中考虑这些信息。"},
                             )
@@ -166,8 +166,8 @@ class AutoGPT:
                             )
                             
                             # 长期记忆
-                            if long_term_memory is not None:
-                                long_term_memory.save_context(
+                            if self.long_term_memory is not None:
+                                self.long_term_memory.save_context(
                                     {"input": "用户补充：" + additional_discussion},
                                     {"output": "记录用户补充内容以供后续参考。"},
                                 )
@@ -226,7 +226,7 @@ class AutoGPT:
                     print(result)
 
                 # 更新短时记忆，存储 thought 和 action 作为输入，以及执行结果作为输出
-                short_term_memory.save_context(
+                self.short_term_memory.save_context(
                     {"input": str(thought_and_action.thought)},
                     {"output": result},
                 )
@@ -240,12 +240,11 @@ class AutoGPT:
                 thought_step_count += 1
 
             # 任务结束的时候，加入长时记忆即可
-            if long_term_memory is not None:
-                long_memory_history = summary_memory.load_memory_variables({}).get("history", "")
-                long_term_memory.save_context(
-                    {"input": initial_task_description},
-                    {"output": long_memory_history},
-                )
+            long_memory_history = summary_memory.load_memory_variables({}).get("history", "")
+            self.long_term_memory.save_context(
+                {"input": initial_task_description},
+                {"output": long_memory_history},
+            )
 
             if finish_turn:  # 如果满足结束条件，则进行后续处理
                 reply = self._final_step(summary_memory, initial_task_description)
@@ -253,18 +252,17 @@ class AutoGPT:
                 reply = thought_and_action.thought.speak
             print(reply)
             # Decide whether to continue based on the context
-            user_decision = self._prompt_user_to_continue()
-            if user_decision.lower() in ['yes', 'y', '是', 'y是', '是的']:
-                task_description = self._get_user_input("请输入下一个任务描述：")
-                initial_task_description = task_description  # Update for next iteration
-                continue
-            else:
-                finish_all_tasks = True
-                # short_term_memory.clear()
-                # if long_term_memory is not None:
-                #     self._clear_long_term_memory(long_term_memory)
-                # print("记忆已清除，任务已结束。")
-                break
+            # user_decision = self._prompt_user_to_continue()
+            # if user_decision.lower() in ['yes', 'y', '是', 'y是', '是的']:
+            #     task_description = self._get_user_input("请输入下一个任务描述：")
+            #     initial_task_description = task_description  # Update for next iteration
+            #     continue
+            finish_all_tasks = True
+            # short_term_memory.clear()
+            # if long_term_memory is not None:
+            #     self._clear_long_term_memory(long_term_memory)
+            # print("记忆已清除，任务已结束。")
+            break
 
         return reply
 
